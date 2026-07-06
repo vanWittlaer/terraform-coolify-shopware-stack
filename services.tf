@@ -126,8 +126,12 @@ resource "coolify_application_docker_image" "mailpit" {
   project_uuid     = var.project_uuid
   server_uuid      = var.server_uuid
   environment_name = var.environment_name
-  docker_image     = "axllent/mailpit:v1.30.3"
-  ports_exposes    = "8025,1025"
+  # Image name and tag are SEPARATE fields (like the web app's web_image/web_image_tag):
+  # Coolify validates docker_registry_image_name and rejects a tag embedded in it (422
+  # "docker registry image name field format is invalid"), so the tag must go here.
+  docker_image              = "axllent/mailpit"
+  docker_registry_image_tag = "v1.30.3"
+  ports_exposes             = "8025,1025"
   # Stable DNS alias on the shared network so web/workers can reach SMTP at a fixed name.
   # Without it, only the "<uuid>-<deploy-id>" container name resolves — never the bare uuid —
   # and MAILER_DSN (locals.tf, local.mailpit_host) can't connect. Keep in sync with that local.
