@@ -1,0 +1,109 @@
+# Example values for the two-environment wiring. Copy to terraform.tfvars and fill in.
+# Secrets belong in a git-ignored secrets.auto.tfvars, NOT here. `tofu validate` does not
+# read this file; it exists to document the required inputs.
+
+# --- Coolify control plane ---
+coolify_endpoint = "https://coolify.example.com" # or COOLIFY_ENDPOINT env var
+coolify_token    = "REPLACE_ME"                  # or COOLIFY_TOKEN env var (effectively root — guard it)
+
+# --- Coolify project (owns both environments) ---
+project_name = "MyShop"
+
+# --- Ops/maintenance backup sidecar image (env-agnostic; pin a released tag for prod) ---
+backup_image     = "ghcr.io/you/shopware-ops-shell"
+backup_image_tag = "latest"
+
+# --- Extra env vars fanned out to every app process ---
+static_env = {
+  TRUSTED_PROXIES = "0.0.0.0/0" # safe ONLY if the web port is reachable only via the proxy
+}
+
+# --- Host base dir for bind mounts (var/log, staging .htpasswd). "" disables the mounts ---
+log_host_base = "/data/shopware"
+
+production = {
+  web_image         = "ghcr.io/you/app/prod"
+  web_image_tag     = "latest"
+  web_domain        = "https://shop.example.com"
+  app_env           = "prod"
+  app_debug         = "0"
+  monolog_log_level = "error"
+
+  enable_elasticsearch = true
+  enable_mailpit       = false
+  enable_backup        = true
+  backup = {
+    s3_backup_bucket = "myshop-backup"
+    s3_backup_region = "hel1"
+    s3_backup_domain = "https://hel1.your-objectstorage.com"
+    s3_backup_path   = "production"
+  }
+
+  mariadb_conf = "[mysqld]\ninnodb_buffer_pool_size=1G\n"
+  redis_conf = {
+    cache   = "appendonly no\nsave \"\"\nmaxmemory-policy volatile-lru\n"
+    session = "appendonly yes\nmaxmemory-policy allkeys-lru\n"
+  }
+
+  s3 = {
+    bucket_private = "myshop-private"
+    bucket_public  = "myshop-public"
+    region         = "hel1"
+    endpoint       = "https://hel1.your-objectstorage.com"
+    cdn_domain     = "https://hel1.your-objectstorage.com/myshop-public/production/public"
+  }
+}
+
+staging = {
+  web_image         = "ghcr.io/you/app/stage"
+  web_image_tag     = "latest"
+  web_domain        = "https://staging.example.com"
+  app_env           = "stage"
+  app_debug         = "1"
+  monolog_log_level = "debug"
+
+  enable_elasticsearch = true
+  enable_mailpit       = true
+  mailpit_domain       = "https://mailpit.staging.example.com"
+  enable_backup        = true
+  backup = {
+    s3_backup_bucket = "myshop-backup"
+    s3_backup_region = "hel1"
+    s3_backup_domain = "https://hel1.your-objectstorage.com"
+    s3_backup_path   = "staging"
+  }
+
+  mariadb_conf = "[mysqld]\ninnodb_buffer_pool_size=500M\n"
+  redis_conf = {
+    cache   = "appendonly no\nsave \"\"\nmaxmemory-policy volatile-lru\n"
+    session = "appendonly yes\nmaxmemory-policy allkeys-lru\n"
+  }
+
+  s3 = {
+    bucket_private = "myshop-private"
+    bucket_public  = "myshop-public"
+    region         = "hel1"
+    endpoint       = "https://hel1.your-objectstorage.com"
+    cdn_domain     = "https://hel1.your-objectstorage.com/myshop-public/staging/public"
+  }
+}
+
+# --- Secrets: put these in a git-ignored secrets.auto.tfvars, shown here for shape only ---
+# secrets_production = {
+#   server_uuid          = "REPLACE_ME"
+#   app_secret           = "REPLACE_ME" # openssl rand -hex 16, stable across deploys
+#   instance_id          = "REPLACE_ME"
+#   rabbitmq_password    = "REPLACE_ME"
+#   s3_access_key_id     = "REPLACE_ME"
+#   s3_secret_access_key = "REPLACE_ME"
+#   mailer_dsn           = "smtp://user:pass@smtp.example.com:587"
+# }
+# secrets_staging = {
+#   server_uuid          = "REPLACE_ME"
+#   app_secret           = "REPLACE_ME"
+#   instance_id          = "REPLACE_ME"
+#   rabbitmq_password    = "REPLACE_ME"
+#   s3_access_key_id     = "REPLACE_ME"
+#   s3_secret_access_key = "REPLACE_ME"
+#   mailpit_ui_auth      = "admin:changeme"
+# }
