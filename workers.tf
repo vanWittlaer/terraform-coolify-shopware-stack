@@ -78,7 +78,7 @@ resource "coolify_envs_bulk" "workers" {
   variables = merge(local.shared_env, {
     APP_IMAGE = "${var.web_image}:${var.web_image_tag}"
     # Host path for the workers' var/log bind mount (long-form `type: bind` in the compose).
-    LOG_HOST_PATH = var.log_host_path
+    LOG_HOST_PATH = local.log_host_path
   })
 }
 

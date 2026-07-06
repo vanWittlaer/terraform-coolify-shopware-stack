@@ -56,8 +56,10 @@ A complete two-environment (production + staging) wiring is in
 | `backup` / `backup_image` / `backup_image_tag` | Backup sidecar config + image. |
 | `mariadb_conf` / `redis_conf` | Per-service tuning (`redis_conf` is a `{cache,session}` map). |
 | `mariadb_public_port` / `rabbitmq_mgmt_port` | Host ports for DB / RabbitMQ mgmt UI. |
-| `log_host_path` / `basic_auth_host_path` | Host bind-mount paths (`var/log`, staging `.htpasswd` dir). |
+| `log_host_base` | Host BASE dir for bind mounts; the module appends `/<environment_name>/var/log` (and `/auth`). Empty ⇒ no log mount. |
+| `enable_basic_auth` | Bind-mount `<log_host_base>/<env>/auth` (`.htpasswd`) into the web app — typically `true` for staging, `false` for production. |
 | `s3` | Object-storage object (buckets/region/endpoint/cdn). |
+| `redis_url_seed` | **Migration-only** map (`cache`/`session`). Leave empty on fresh installs; used to repair a pre-existing deployment whose Redis `internal_db_url` was nulled in state. See FINDINGS. |
 | `secrets` | Sensitive object (`app_secret`, `instance_id`, S3/RabbitMQ/backup creds, `server_uuid`). |
 
 ## Outputs

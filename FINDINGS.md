@@ -225,9 +225,13 @@ Two-part mitigation (this stack):
   reproduces Coolify's URL exactly. It never goes null → self-healing, no `ignore_changes`, no
   state repair.
 - **Redis** — the provider exposes **no** password attribute (and the Coolify API/`/envs` don't
-  return values), so the DSN can't be reconstructed. Instead the two Redis URLs live in a
-  dedicated `coolify_envs_bulk` (`redis.tf`) with `lifecycle { ignore_changes = [variables] }`:
-  written **once at create** (when `internal_db_url` is still valid) and never touched again. A
-  pre-existing deployment already nulled in state is repaired one-time via the optional
-  `redis_url_seed` input (operator pastes the URLs from the Coolify UI); the `MISSING_SEED`
-  sentinel fails loud rather than writing an empty URL.
+  return values), so the DSN can't be reconstructed. Instead each Redis URL is **captured once**
+  into a `terraform_data.redis_url` keyed on the **Redis DB** (`redis.tf`): `input` is read at
+  create (when `internal_db_url` is still valid), `ignore_changes = [input]` freezes it against
+  the refresh-nulling, and `triggers_replace` on the DB uuid re-captures only if the DB itself is
+  replaced. The `coolify_envs_bulk.redis_dsns` (web + workers; backup has no Redis) reads that
+  frozen value — so it can be **recreated freely** (e.g. the web/workers resource is replaced)
+  and still get the right URL, with no `ignore_changes` of its own. A pre-existing deployment
+  already nulled in state is repaired one-time via the optional `redis_url_seed` input (operator
+  pastes the URLs from the Coolify UI); the `MISSING_SEED` sentinel fails loud rather than writing
+  an empty URL.

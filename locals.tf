@@ -13,18 +13,23 @@ locals {
   # it never goes null — so it survives refresh with no ignore_changes and no state repair.
   mariadb_dsn = "mysql://${coolify_database_mariadb.main.mariadb_user}:${coolify_database_mariadb.main.mariadb_password}@${coolify_database_mariadb.main.uuid}:3306/${coolify_database_mariadb.main.mariadb_database}"
 
-  # Redis DSNs are handled OUT of the shared env because internal_db_url doesn't round-trip AND
-  # (unlike MariaDB) the provider exposes no password attribute to reconstruct from. They live in
-  # a dedicated ignore_changes bulk (redis.tf) written once at create. coalesce order: the live
-  # URL wins on a fresh create; var.redis_url_seed repairs a pre-nulled existing deployment; the
-  # loud "MISSING_SEED" sentinel prevents silently writing a null/empty Redis URL.
+  # Redis DSNs are handled OUT of the shared env (redis.tf): internal_db_url doesn't round-trip
+  # and the provider exposes no redis password to reconstruct from. The values come from the
+  # stable terraform_data.redis_url capture (see redis.tf), so they survive both refresh-nulling
+  # AND a recreation of the web/workers envs_bulk.
   redis_targets = {
     web     = { type = "application", uuid = coolify_application_docker_image.web.uuid }
     workers = { type = "service", uuid = coolify_service.workers.uuid }
   }
+
+  # Per-env bind-mount host paths derived from the base dir + environment_name, so the call site
+  # never repeats "production"/"staging". Empty base => no log mount; basic-auth also gated on the
+  # per-env enable_basic_auth toggle (staging protected, production not).
+  log_host_path        = var.log_host_base == "" ? "" : "${var.log_host_base}/${var.environment_name}/var/log"
+  basic_auth_host_path = var.enable_basic_auth && var.log_host_base != "" ? "${var.log_host_base}/${var.environment_name}/auth" : ""
   redis_env = {
-    REDIS_CACHE_URL   = coalesce(coolify_database_redis.r["cache"].internal_db_url, try(var.redis_url_seed["cache"], ""), "MISSING_SEED")
-    REDIS_SESSION_URL = coalesce(coolify_database_redis.r["session"].internal_db_url, try(var.redis_url_seed["session"], ""), "MISSING_SEED")
+    REDIS_CACHE_URL   = terraform_data.redis_url["cache"].output
+    REDIS_SESSION_URL = terraform_data.redis_url["session"].output
   }
 
   # S3 in-bucket prefix: null => "<env>/" (shared-bucket isolation), "" => bucket root,

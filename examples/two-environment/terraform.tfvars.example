@@ -88,22 +88,6 @@ staging = {
   }
 }
 
-# --- Secrets: put these in a git-ignored secrets.auto.tfvars, shown here for shape only ---
-# secrets_production = {
-#   server_uuid          = "REPLACE_ME"
-#   app_secret           = "REPLACE_ME" # openssl rand -hex 16, stable across deploys
-#   instance_id          = "REPLACE_ME"
-#   rabbitmq_password    = "REPLACE_ME"
-#   s3_access_key_id     = "REPLACE_ME"
-#   s3_secret_access_key = "REPLACE_ME"
-#   mailer_dsn           = "smtp://user:pass@smtp.example.com:587"
-# }
-# secrets_staging = {
-#   server_uuid          = "REPLACE_ME"
-#   app_secret           = "REPLACE_ME"
-#   instance_id          = "REPLACE_ME"
-#   rabbitmq_password    = "REPLACE_ME"
-#   s3_access_key_id     = "REPLACE_ME"
-#   s3_secret_access_key = "REPLACE_ME"
-#   mailpit_ui_auth      = "admin:changeme"
-# }
+# --- Secrets ---
+# The per-env secrets objects (secrets_production / secrets_staging, incl. server_uuid) live in a
+# separate git-ignored `secrets.auto.tfvars` — copy `secrets.auto.tfvars.example` and fill it in.

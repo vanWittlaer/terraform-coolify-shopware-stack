@@ -137,16 +137,16 @@ variable "rabbitmq_mgmt_port" {
   description = "Host port to expose the RabbitMQ management UI on (maps to the container's 15672). Injected into the service compose via env interpolation (docker_compose_raw must stay constant)."
 }
 
-variable "log_host_path" {
+variable "log_host_base" {
   type        = string
-  description = "Host directory bind-mounted into every app process at /var/www/html/var/log (the one filesystem write left after moving the private/public filesystems to S3). MUST be unique per environment whenever prod and staging point at the same server; harmless when they're on separate servers. Empty string disables the bind mount (logs stay ephemeral in-container)."
+  description = "Host BASE directory for this stack's bind mounts. The module appends the environment name per env, so logs land at <log_host_base>/<environment_name>/var/log (the one filesystem write left after moving the private/public filesystems to S3) — no need to repeat the env name at the call site. Per-env subdir keeps prod and staging isolated when they share a server; harmless when separate. Empty string disables the log bind mount (logs stay ephemeral in-container)."
   default     = ""
 }
 
-variable "basic_auth_host_path" {
-  type        = string
-  description = "Host directory bind-mounted into the web app at /var/www/auth, holding the .htpasswd that the staging basic-auth image (final-protected) reads (see shopware/docker/nginx-basic-auth). A DIRECTORY mount, not a single file — coolify_storage has no file-content field and a bare single-file mount is created as a dir when absent. Create the dir + .htpasswd out-of-band and chown 82 (like the var/log dir). Empty string => no mount (production uses final-prod, which carries no basic-auth config)."
-  default     = ""
+variable "enable_basic_auth" {
+  type        = bool
+  description = "When true (and log_host_base is set), bind-mount <log_host_base>/<environment_name>/auth into the web app at /var/www/auth, holding the .htpasswd that the basic-auth image (final-protected) reads (see shopware/docker/nginx-basic-auth). A DIRECTORY mount, not a single file. Create the dir + .htpasswd out-of-band and chown 82 (like the var/log dir). Typically true for staging, false for production (final-prod carries no basic-auth config)."
+  default     = false
 }
 
 variable "s3" {
