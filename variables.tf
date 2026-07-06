@@ -186,9 +186,11 @@ variable "redis_url_seed" {
   type        = map(string)
   default     = {}
   description = <<-EOT
-    One-time repair seed for the Redis DSNs, keyed "cache"/"session". ONLY needed to migrate a
-    pre-existing deployment whose coolify_database_redis.internal_db_url has already been nulled
-    in state by a refresh. Fresh deployments leave this empty — the redis_dsns bulk (redis.tf)
-    captures the real URL at create time. Format: redis://default:<password>@<db-uuid>:6379/0.
+    RECOVERY seed for the Redis DSNs, keyed "cache"/"session". Leave empty in normal use on any
+    version — the terraform_data.redis_url capture (redis.tf) grabs the real URL at create and
+    keeps it across web/workers/Redis-DB replacement. Needed ONLY when that capture must be
+    (re)created while coolify_database_redis.internal_db_url already reads null in state: after a
+    `tofu import` state rebuild, or a first apply interrupted between the DB create and the
+    capture. Format: redis://default:<password>@<db-uuid>:6379/0.
   EOT
 }
