@@ -208,3 +208,26 @@ something that looks odd. Provider version `0.1.7`.
   fetched cross-origin from the S3 host and require `Access-Control-Allow-Origin`. See cors.tf.
 - **Teardown:** `tofu destroy` may leave orphaned containers (they keep Traefik labels and can keep
   serving a domain); remove them on the host with `docker rm -f`.
+
+## `internal_db_url` — non-round-trip nulls the DB/Redis DSNs
+
+`coolify_database_mariadb`/`coolify_database_redis` expose `internal_db_url` as a **create-time
+computed** value that the provider's Read returns as **`null` on every refresh**. If any env var
+is derived from it (`DATABASE_URL`, `LOCK_DSN`, `REDIS_*`), a later `tofu apply` recomputes it to
+null and the dependent `coolify_envs_bulk` update **fails in the provider** ("Received null value …
+Path: [DATABASE_URL]") — or, worse, would push a null DSN to the live app. Same family as the
+`connect_to_docker_network` non-round-trip above.
+
+Two-part mitigation (this stack):
+- **MariaDB** — reconstruct the DSN from the DB's **round-trippable** attributes instead of
+  `internal_db_url`: `mysql://${mariadb_user}:${mariadb_password}@${uuid}:3306/${mariadb_database}`
+  (`local.mariadb_dsn`). The generated password is alphanumeric (no percent-encoding), so this
+  reproduces Coolify's URL exactly. It never goes null → self-healing, no `ignore_changes`, no
+  state repair.
+- **Redis** — the provider exposes **no** password attribute (and the Coolify API/`/envs` don't
+  return values), so the DSN can't be reconstructed. Instead the two Redis URLs live in a
+  dedicated `coolify_envs_bulk` (`redis.tf`) with `lifecycle { ignore_changes = [variables] }`:
+  written **once at create** (when `internal_db_url` is still valid) and never touched again. A
+  pre-existing deployment already nulled in state is repaired one-time via the optional
+  `redis_url_seed` input (operator pastes the URLs from the Coolify UI); the `MISSING_SEED`
+  sentinel fails loud rather than writing an empty URL.

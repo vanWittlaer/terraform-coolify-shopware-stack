@@ -6,6 +6,27 @@ locals {
   # network, which the apps aren't on. The trailing path segment selects the queue.
   amqp_base = "amqp://shopware:${var.secrets.rabbitmq_password}@rabbitmq-${coolify_service.rabbitmq.uuid}:5672/%2f"
 
+  # DATABASE_URL/LOCK_DSN are reconstructed from the DB's ROUND-TRIPPABLE attributes rather than
+  # coolify_database_mariadb.main.internal_db_url, which the provider returns as null on refresh
+  # (non-round-trip; see FINDINGS). Coolify's own URL is mysql://user:pass@<uuid>:3306/<db>; the
+  # generated password is alphanumeric so no percent-encoding is needed. This is self-healing —
+  # it never goes null — so it survives refresh with no ignore_changes and no state repair.
+  mariadb_dsn = "mysql://${coolify_database_mariadb.main.mariadb_user}:${coolify_database_mariadb.main.mariadb_password}@${coolify_database_mariadb.main.uuid}:3306/${coolify_database_mariadb.main.mariadb_database}"
+
+  # Redis DSNs are handled OUT of the shared env because internal_db_url doesn't round-trip AND
+  # (unlike MariaDB) the provider exposes no password attribute to reconstruct from. They live in
+  # a dedicated ignore_changes bulk (redis.tf) written once at create. coalesce order: the live
+  # URL wins on a fresh create; var.redis_url_seed repairs a pre-nulled existing deployment; the
+  # loud "MISSING_SEED" sentinel prevents silently writing a null/empty Redis URL.
+  redis_targets = {
+    web     = { type = "application", uuid = coolify_application_docker_image.web.uuid }
+    workers = { type = "service", uuid = coolify_service.workers.uuid }
+  }
+  redis_env = {
+    REDIS_CACHE_URL   = coalesce(coolify_database_redis.r["cache"].internal_db_url, try(var.redis_url_seed["cache"], ""), "MISSING_SEED")
+    REDIS_SESSION_URL = coalesce(coolify_database_redis.r["session"].internal_db_url, try(var.redis_url_seed["session"], ""), "MISSING_SEED")
+  }
+
   # S3 in-bucket prefix: null => "<env>/" (shared-bucket isolation), "" => bucket root,
   # else verbatim. Normalise to exactly one trailing slash (or empty) so shopware.yaml's
   # "%env(S3_ROOT_PREFIX)%files" concatenation produces e.g. "production/files".
@@ -41,16 +62,14 @@ locals {
   es_on  = var.enable_elasticsearch ? "1" : "0"
 
   computed_env = {
-    # DSNs are read straight from each database's Coolify-generated, computed
-    # internal_db_url — Shopware/Symfony consume these directly.
-    DATABASE_URL = coolify_database_mariadb.main.internal_db_url
-
-    REDIS_CACHE_URL   = coolify_database_redis.r["cache"].internal_db_url
-    REDIS_SESSION_URL = coolify_database_redis.r["session"].internal_db_url
+    # MariaDB DSN is reconstructed from round-trippable attrs (local.mariadb_dsn), NOT
+    # internal_db_url, which the provider nulls on refresh. Redis DSNs are handled separately
+    # in redis.tf (ignore_changes bulk) because the provider exposes no redis password to rebuild.
+    DATABASE_URL = local.mariadb_dsn
 
     # Symfony lock uses the shared DB (DoctrineDbalStore auto-creates lock_keys),
     # matching the .env-web-blueprint default — no dedicated lock Redis.
-    LOCK_DSN = coolify_database_mariadb.main.internal_db_url
+    LOCK_DSN = local.mariadb_dsn
 
     MESSENGER_TRANSPORT_DSN              = "${local.amqp_base}/async"
     MESSENGER_TRANSPORT_LOW_PRIORITY_DSN = "${local.amqp_base}/low_priority"
