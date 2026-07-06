@@ -35,6 +35,16 @@ module "production" {
 A complete two-environment (production + staging) wiring is in
 [`examples/two-environment/`](./examples/two-environment/).
 
+## Adopting this module
+
+1. Copy [`examples/two-environment/`](./examples/two-environment/) as your root config and point
+   `source` at a pinned `?ref=`.
+2. Work through [`PREREQUISITES.md`](./PREREQUISITES.md) — what must be true around `tofu apply`
+   (Coolify token + server, a built web image in a registry, S3 buckets, DNS, secrets) and the
+   one-time manual steps after it (log-dir chown, `.htpasswd`, ES index build).
+3. Decide state handling in [`STATE.md`](./STATE.md) — local + backup by default; S3 if shared.
+4. `tofu init && tofu plan && tofu apply`.
+
 > **Providers:** this module has no `provider` block — it inherits the configured `coolify` and
 > `null` providers from the calling configuration. The `aws` provider used for S3 bucket CORS is a
 > *consumer* concern and lives outside this module (see the example).
