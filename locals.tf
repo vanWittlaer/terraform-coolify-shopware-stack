@@ -6,20 +6,20 @@ locals {
   # network, which the apps aren't on. The trailing path segment selects the queue.
   amqp_base = "amqp://shopware:${var.secrets.rabbitmq_password}@rabbitmq-${coolify_service.rabbitmq.uuid}:5672/%2f"
 
-  # DATABASE_URL/LOCK_DSN are reconstructed from the DB's ROUND-TRIPPABLE attributes rather than
-  # coolify_database_mariadb.main.internal_db_url, which the provider returns as null on refresh
-  # (non-round-trip; see FINDINGS). Coolify's own URL is mysql://user:pass@<uuid>:3306/<db>; the
-  # generated password is alphanumeric so no percent-encoding is needed. This is self-healing —
-  # it never goes null — so it survives refresh with no ignore_changes and no state repair.
+  # DATABASE_URL/LOCK_DSN are reconstructed from values the module OWNS (the module-generated
+  # password, databases.tf) plus round-trippable attributes — never from internal_db_url, which
+  # the API redacts without a read:sensitive token and the provider nulls on refresh (see
+  # FINDINGS). Coolify's own URL is mysql://user:pass@<uuid>:3306/<db>; our passwords are
+  # alphanumeric so no percent-encoding is needed. This is self-healing — it never goes null —
+  # so it survives refresh with no ignore_changes and no state repair.
   mariadb_dsn = "mysql://${coolify_database_mariadb.main.mariadb_user}:${coolify_database_mariadb.main.mariadb_password}@${coolify_database_mariadb.main.uuid}:3306/${coolify_database_mariadb.main.mariadb_database}"
 
-  # Redis DSNs are handled OUT of the shared env (redis.tf): internal_db_url doesn't round-trip
-  # and the provider exposes no redis password to reconstruct from. The values come from the
-  # stable terraform_data.redis_url capture (see redis.tf), so they survive both refresh-nulling
-  # AND a recreation of the web/workers envs_bulk.
-  redis_targets = {
-    web     = { type = "application", uuid = coolify_application_docker_image.web.uuid }
-    workers = { type = "service", uuid = coolify_service.workers.uuid }
+  # Redis DSNs — same reconstruction story, from the module-owned passwords (databases.tf).
+  # Matches Coolify's internal_db_url for redis:7 exactly: the default ACL user is "default"
+  # and the username part is included for Redis >= 6 (StandaloneRedis::internalDbUrl).
+  redis_dsn = {
+    for k in ["cache", "session"] :
+    k => "redis://default:${random_password.redis[k].result}@${coolify_database_redis.r[k].uuid}:6379/0"
   }
 
   # Per-env bind-mount host paths derived from the base dir + environment_name, so the call site
@@ -27,10 +27,6 @@ locals {
   # per-env enable_basic_auth toggle (staging protected, production not).
   log_host_path        = var.log_host_base == "" ? "" : "${var.log_host_base}/${var.environment_name}/var/log"
   basic_auth_host_path = var.enable_basic_auth && var.log_host_base != "" ? "${var.log_host_base}/${var.environment_name}/auth" : ""
-  redis_env = {
-    REDIS_CACHE_URL   = terraform_data.redis_url["cache"].output
-    REDIS_SESSION_URL = terraform_data.redis_url["session"].output
-  }
 
   # S3 in-bucket prefix: null => "<env>/" (shared-bucket isolation), "" => bucket root,
   # else verbatim. Normalise to exactly one trailing slash (or empty) so shopware.yaml's
@@ -67,14 +63,16 @@ locals {
   es_on  = var.enable_elasticsearch ? "1" : "0"
 
   computed_env = {
-    # MariaDB DSN is reconstructed from round-trippable attrs (local.mariadb_dsn), NOT
-    # internal_db_url, which the provider nulls on refresh. Redis DSNs are handled separately
-    # in redis.tf (ignore_changes bulk) because the provider exposes no redis password to rebuild.
+    # All DB DSNs are reconstructed from module-owned credentials (local.mariadb_dsn /
+    # local.redis_dsn above), NOT internal_db_url — see the comments up top and FINDINGS.
     DATABASE_URL = local.mariadb_dsn
 
     # Symfony lock uses the shared DB (DoctrineDbalStore auto-creates lock_keys),
     # matching the .env-web-blueprint default — no dedicated lock Redis.
     LOCK_DSN = local.mariadb_dsn
+
+    REDIS_CACHE_URL   = local.redis_dsn["cache"]
+    REDIS_SESSION_URL = local.redis_dsn["session"]
 
     MESSENGER_TRANSPORT_DSN              = "${local.amqp_base}/async"
     MESSENGER_TRANSPORT_LOW_PRIORITY_DSN = "${local.amqp_base}/low_priority"

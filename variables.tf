@@ -181,16 +181,3 @@ variable "secrets" {
   })
   sensitive = true
 }
-
-variable "redis_url_seed" {
-  type        = map(string)
-  default     = {}
-  description = <<-EOT
-    RECOVERY seed for the Redis DSNs, keyed "cache"/"session". Leave empty in normal use on any
-    version — the terraform_data.redis_url capture (redis.tf) grabs the real URL at create and
-    keeps it across web/workers/Redis-DB replacement. Needed ONLY when that capture must be
-    (re)created while coolify_database_redis.internal_db_url already reads null in state: after a
-    `tofu import` state rebuild, or a first apply interrupted between the DB create and the
-    capture. Format: redis://default:<password>@<db-uuid>:6379/0.
-  EOT
-}

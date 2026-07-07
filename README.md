@@ -69,7 +69,6 @@ A complete two-environment (production + staging) wiring is in
 | `log_host_base` | Host BASE dir for bind mounts; the module appends `/<environment_name>/var/log` (and `/auth`). Empty ⇒ no log mount. |
 | `enable_basic_auth` | Bind-mount `<log_host_base>/<env>/auth` (`.htpasswd`) into the web app — typically `true` for staging, `false` for production. |
 | `s3` | Object-storage object (buckets/region/endpoint/cdn). |
-| `redis_url_seed` | **Recovery-only** map (`cache`/`session`). Leave empty in normal use (any version); used only when the Redis DSN capture must be (re)created against an already-nulled `internal_db_url` — e.g. state rebuilt via `tofu import`, or an interrupted first apply. See FINDINGS. |
 | `secrets` | Sensitive object (`app_secret`, `instance_id`, S3/RabbitMQ/backup creds, `server_uuid`). |
 
 ## Outputs

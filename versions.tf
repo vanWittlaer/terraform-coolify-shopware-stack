@@ -9,5 +9,11 @@ terraform {
     null = {
       source = "hashicorp/null"
     }
+    # DB credentials are module-generated (databases.tf) so every DSN can be built
+    # without reading sensitive fields back from the Coolify API — see FINDINGS
+    # ("read:sensitive").
+    random = {
+      source = "hashicorp/random"
+    }
   }
 }

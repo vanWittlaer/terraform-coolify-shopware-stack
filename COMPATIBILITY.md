@@ -15,6 +15,7 @@ before a release.
 | OpenTofu (`tofu`) | **≥ 1.7.0** | `versions.tf` (`required_version`) | 1.7 is the floor for the provider + import support used here. |
 | Provider `coolify-terraform/coolify` | **~> 0.1.7** (tested at 0.1.7) | `versions.tf` | Source is `coolify-terraform/coolify` — **not** `hashicorp/coolify` (which does not exist and fails at `init`). Carries the known limitations below. |
 | Provider `hashicorp/aws` | **~> 5.0** | `versions.tf` | Used **only** for S3 bucket CORS (`cors.tf`) against the S3-compatible endpoint. Not for any AWS compute. |
+| Provider `hashicorp/random` | any | `versions.tf` | Generates the DB credentials (`databases.tf`) so no DSN ever depends on reading a secret back from the Coolify API. |
 
 ## Control plane & host
 
@@ -64,6 +65,11 @@ These are the places where a version bump can break the stack — check them on 
    expanded for a literal YAML value, not an env-injected one (Symfony 7.4). (`variables.tf`)
 6. **PHP 8.4 hard floor** — set by the base image; an infra-only change that alters PHP needs
    an image rebuild, not just a `tofu apply`.
+7. **API sensitive-data redaction** — without the `read:sensitive` token ability, Coolify 4.1.2
+   strips `internal_db_url`, generated DB passwords, env-var values and SSH private keys from
+   every API response (even the read right after create). The module therefore owns all DB
+   credentials and needs only **read + write + deploy**; never derive anything from
+   `internal_db_url`. (`databases.tf`, `locals.tf`, FINDINGS)
 
 ## Floating versions — pin, or keep floating on purpose
 

@@ -20,12 +20,11 @@ No backend service, no encryption ceremony. For one person this is genuinely fin
 Losing `tofu.tfstate` is annoying, not fatal — the resources still exist in Coolify:
 
 - **Rebuild state** by re-adopting each resource with `tofu import` (the provider supports it;
-  see `FINDINGS.md`). MariaDB DSNs self-heal from the DB's attributes; **reseed the two Redis
-  URLs** via `redis_url_seed` (paste from the Coolify UI), since `internal_db_url` reads null on
-  import.
+  see `FINDINGS.md`). All DSNs self-heal from module-owned credentials; the `random_password`
+  resources import with the password value itself as the ID (read it from the Coolify UI).
 - **`secrets.auto.tfvars` is the file you truly cannot lose.** `app_secret` / `instance_id` live
   only there and can only be *regenerated* — and a new `app_secret` invalidates live sessions and
-  signed URLs. DB/Redis passwords are Coolify-generated and survive state loss.
+  signed URLs. DB/Redis passwords survive state loss in Coolify itself (recoverable via the UI).
 
 **Backup priority: `secrets.auto.tfvars` first, `tofu.tfstate` second.**
 

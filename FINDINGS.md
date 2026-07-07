@@ -22,10 +22,11 @@ something that looks odd. Provider version `0.1.7`.
   succeed for every resource type we use: `coolify_project`, `coolify_database_mariadb`,
   `coolify_application_docker_image`, `coolify_service` (all by bare UUID) and `coolify_envs_bulk`
   (id form `application:<uuid>`).
-- Generated secrets ARE recoverable: importing the mariadb re-reads `internal_db_url` (carries
-  the Coolify-generated password); Redis is the same. Our *owned* secrets
-  (app_secret/instance_id/rabbitmq_password) live in `secrets.auto.tfvars`, not state — so a lost
-  state file loses NO secret.
+- DB passwords are module-generated `random_password` resources (databases.tf), so they live in
+  state. If the state file is lost they're still recoverable: read the password from the Coolify
+  UI (or the API with a `read:sensitive` token) and `tofu import` it — `random_password` imports
+  with the password value itself as the ID. Our *owned* secrets
+  (app_secret/instance_id/rabbitmq_password) live in `secrets.auto.tfvars`, not state.
 - `coolify_envs_bulk.variables` are write-only (the perpetual-diff quirk) and do NOT come back on
   import — but they don't need to: they're sourced from `locals.tf` and re-pushed next apply.
 - Catch: recovery is MANUAL and per-resource — ~30 `tofu import` calls, each needing a
@@ -116,13 +117,21 @@ something that looks odd. Provider version `0.1.7`.
   sets a Redis stop-flag — only an optimization; the image swap still happens via each worker's
   SIGTERM redeploy.)
 
-## DB/Redis credentials (consumed, not set)
-- Omitting `mariadb_password` / `mariadb_root_password` / `redis_password` lets Coolify
-  autogenerate them (no "required argument" error) — plan shows them as computed `(sensitive
-  value)`. ✅
-- `coolify_database_mariadb.main.internal_db_url` is accepted by Shopware as `DATABASE_URL` as-is
-  (user `shopware`, db `shopware`, internal host). ✅ (prod runs on it.)
-- Each Redis `internal_db_url` works directly as `REDIS_CACHE_URL` / `REDIS_SESSION_URL`. ✅
+## DB/Redis credentials (module-owned)
+- The module SETS `mariadb_password` / `mariadb_root_password` / `redis_password` from
+  `random_password` resources (databases.tf) and reconstructs every DSN from them (locals.tf) —
+  it never needs a credential back from the API. This is forced by the `read:sensitive`
+  redaction (see below): omitting the passwords lets Coolify autogenerate them, but a narrow
+  token can never read them back, so no DSN could be built.
+- Supplied passwords take the CREATE path end to end: provider 0.1.7 puts them in the create
+  payload (not the 422-prone extended-fields update), and Coolify's `create_standalone_redis`
+  honors a supplied `redis_password` (it becomes the container's `REDIS_PASSWORD`);
+  `create_standalone_mariadb` fills both mariadb passwords from the payload. (Verified in both
+  sources at v0.1.7 / v4.1.2.)
+- DSN formats (mirror Coolify's own `internal_db_url` accessors exactly; alphanumeric passwords
+  ⇒ no percent-encoding): MariaDB `mysql://shopware:<pass>@<uuid>:3306/shopware`; Redis ≥ 6
+  includes the default ACL user — `redis://default:<pass>@<uuid>:6379/0`. Both verified accepted
+  by Shopware as `DATABASE_URL` / `REDIS_*_URL`. ✅
 - Redis is cache + session only; `LOCK_DSN` points at `DATABASE_URL` (Symfony DoctrineDbalStore
   auto-creates `lock_keys`), matching the .env-web-blueprint default — no dedicated lock Redis. ✅
 
@@ -209,29 +218,37 @@ something that looks odd. Provider version `0.1.7`.
 - **Teardown:** `tofu destroy` may leave orphaned containers (they keep Traefik labels and can keep
   serving a domain); remove them on the host with `docker rm -f`.
 
-## `internal_db_url` — non-round-trip nulls the DB/Redis DSNs
+## API `read:sensitive` — Coolify redacts `internal_db_url` & friends per token ability
 
-`coolify_database_mariadb`/`coolify_database_redis` expose `internal_db_url` as a **create-time
-computed** value that the provider's Read returns as **`null` on every refresh**. If any env var
-is derived from it (`DATABASE_URL`, `LOCK_DSN`, `REDIS_*`), a later `tofu apply` recomputes it to
-null and the dependent `coolify_envs_bulk` update **fails in the provider** ("Received null value …
-Path: [DATABASE_URL]") — or, worse, would push a null DSN to the live app. Same family as the
-`connect_to_docker_network` non-round-trip above.
+Coolify API tokens carry abilities (`read`, `read:sensitive`, `write`, `deploy`, `root`). Without
+`read:sensitive`, `DatabasesController::removeSensitiveData` (verified at v4.1.2) strips
+`internal_db_url`, `external_db_url` and the generated passwords (`redis_password`,
+`postgres_password`, …) from EVERY database response — including the read right after create. Env
+var **values** and SSH **private keys** are redacted the same way (the `/envs` list returns keys
+without values).
 
-Two-part mitigation (this stack):
-- **MariaDB** — reconstruct the DSN from the DB's **round-trippable** attributes instead of
-  `internal_db_url`: `mysql://${mariadb_user}:${mariadb_password}@${uuid}:3306/${mariadb_database}`
-  (`local.mariadb_dsn`). The generated password is alphanumeric (no percent-encoding), so this
-  reproduces Coolify's URL exactly. It never goes null → self-healing, no `ignore_changes`, no
-  state repair.
-- **Redis** — the provider exposes **no** password attribute (and the Coolify API/`/envs` don't
-  return values), so the DSN can't be reconstructed. Instead each Redis URL is **captured once**
-  into a `terraform_data.redis_url` keyed on the **Redis DB** (`redis.tf`): `input` is read at
-  create (when `internal_db_url` is still valid), `ignore_changes = [input]` freezes it against
-  the refresh-nulling, and `triggers_replace` on the DB uuid re-captures only if the DB itself is
-  replaced. The `coolify_envs_bulk.redis_dsns` (web + workers; backup has no Redis) reads that
-  frozen value — so it can be **recreated freely** (e.g. the web/workers resource is replaced)
-  and still get the right URL, with no `ignore_changes` of its own. A pre-existing deployment
-  already nulled in state is repaired one-time via the optional `redis_url_seed` input (operator
-  pastes the URLs from the Coolify UI); the `MISSING_SEED` sentinel fails loud rather than writing
-  an empty URL.
+- ⚠️ Upstream inconsistency: `mariadb_password` / `mariadb_root_password` (and the mysql ones) are
+  NOT in the hidden list, so they leak through to narrow tokens. Don't build on that — it's one
+  upstream patch away from closing.
+- How this bit us: v0.4.0's Redis DSN handling captured `internal_db_url` at create into a
+  `terraform_data`, assuming it's "valid at create, nulled only on refresh". With a token lacking
+  `read:sensitive` it is null **at create too**, so a fresh bootstrap captured (and froze, via
+  `ignore_changes`) the loud `MISSING_SEED` sentinel into `REDIS_CACHE_URL`/`REDIS_SESSION_URL`.
+- Fix (v0.5.0): the module generates all DB passwords itself (databases.tf) and reconstructs the
+  DSNs from them — **no `read:sensitive` needed anywhere in the stack**. The
+  `terraform_data.redis_url` capture and the `redis_url_seed` recovery input are gone.
+
+## `internal_db_url` — non-round-trip (and now redacted): never derive DSNs from it
+
+`coolify_database_mariadb`/`coolify_database_redis` expose `internal_db_url` as a computed value
+that the provider's Read returns as **`null` on every refresh** (same family as the
+`connect_to_docker_network` non-round-trip above) — and that the API **redacts even at create**
+for tokens without `read:sensitive` (see previous section). If any env var were derived from it
+(`DATABASE_URL`, `LOCK_DSN`, `REDIS_*`), a later `tofu apply` would recompute it to null and the
+dependent `coolify_envs_bulk` update **fails in the provider** ("Received null value … Path:
+[DATABASE_URL]") — or, worse, would push a null DSN to the live app.
+
+Mitigation (this stack, since v0.5.0): every DSN is reconstructed from values the module owns —
+the `random_password` credentials plus round-trippable attributes (`uuid`, `mariadb_user`,
+`mariadb_database`); see `local.mariadb_dsn` / `local.redis_dsn`. Reconstructed DSNs never go
+null → self-healing, no `ignore_changes`, no state repair, no seed inputs.
