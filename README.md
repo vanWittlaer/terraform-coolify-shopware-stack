@@ -7,6 +7,21 @@ Elasticsearch, optional Mailpit (staging) and an optional backup sidecar.
 Provider quirks and version couplings are documented in [`FINDINGS.md`](./FINDINGS.md) and
 [`COMPATIBILITY.md`](./COMPATIBILITY.md).
 
+## Intended usage: day-0 bootstrap
+
+This module is built to be applied **once**, at setup time — after that the
+**Coolify UI is the single source of truth** for the running environment.
+The Coolify provider pushes env vars write-only (re-sent on every apply, UI
+drift invisible), so re-applying against a UI-managed environment silently
+overwrites changes made there. Provision, verify, then archive your state and
+secrets off-machine; upgrade running shops via the Coolify UI, not by
+re-applying a newer module version.
+
+The turnkey consumer is the
+[`ddev-coolify-bootstrap`](https://github.com/vanWittlaer/ddev-coolify-bootstrap)
+ddev add-on (`ddev coolify-bootstrap init && ddev coolify-bootstrap up`), with
+[swoofy](https://github.com/vanWittlaer/swoofy) as the full reference project.
+
 ## Usage
 
 ```hcl
