@@ -41,8 +41,8 @@ before a release.
 
 | Service | Image / tag | Where pinned | Notes |
 |---------|-------------|--------------|-------|
-| MariaDB | `mariadb:11` | `databases.tf` | `mariadb_conf` tuning disabled via provider (Coolify 4.1.2 rejects the extended-fields update — set in UI). |
-| Redis (cache + session) | `redis:7` | `databases.tf` | Two instances; `redis_conf` disabled for the same reason. Symfony lock uses the DB (`LOCK_DSN`), no lock Redis. |
+| MariaDB | `mariadb:11.8` | `databases.tf` | Pinned to the 11.x LTS minor (bare `11` would let a redeploy jump minor series — an irreversible datadir upgrade). `mariadb_conf` tuning disabled via provider (Coolify 4.1.2 rejects the extended-fields update — set in UI). |
+| Redis (cache + session) | `redis:7.4` | `databases.tf` | Two instances, minor-pinned (was bare `7`). `redis_conf` disabled for the same reason. Symfony lock uses the DB (`LOCK_DSN`), no lock Redis. |
 | Elasticsearch | `elasticsearch:8.15.0` | `services.tf` | Must match Shopware's supported ES/OpenSearch range for the pinned core. Runs with `-Xmx512m`; real footprint ≫ heap (mind host RAM). |
 | RabbitMQ | `rabbitmq:3.13-management` | `services.tf` | Management UI port is per-env (`rabbitmq_mgmt_port`). |
 | Mailpit (staging only) | `axllent/mailpit:v1.30.3` | `services.tf` | Staging SMTP sink; reached via the stable per-env `mailpit-<env>` network alias. |
@@ -91,7 +91,11 @@ are reproducibility gaps to close for an adoptable release.
 - Provider `~> 0.1.7` and `aws ~> 5.0` are ranges — fine for now, but pin exactly if you need
   bit-for-bit reproducibility across adopters.
 
-`axllent/mailpit` is now pinned to `v1.30.3` (`services.tf`).
+`axllent/mailpit` is now pinned to `v1.30.3` (`services.tf`). MariaDB and Redis are now
+minor-pinned (`mariadb:11.8`, `redis:7.4`) rather than bare-major — a redeploy re-pulls the
+tag, and for the stateful DBs a silent minor jump is an irreversible datadir upgrade, so the
+minor is frozen (patches still flow). RabbitMQ (`3.13-management`) and Elasticsearch
+(`8.15.0`) are already minor/patch-pinned.
 
 ## On upgrade — recommended checklist
 

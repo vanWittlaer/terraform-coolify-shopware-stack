@@ -16,7 +16,7 @@ resource "coolify_database_mariadb" "main" {
   project_uuid          = var.project_uuid
   server_uuid           = var.server_uuid
   environment_name      = var.environment_name
-  image                 = "mariadb:11"
+  image                 = "mariadb:11.8"
   mariadb_user          = "shopware"
   mariadb_password      = random_password.mariadb["user"].result
   mariadb_database      = "shopware"
@@ -54,7 +54,7 @@ resource "coolify_database_redis" "r" {
   project_uuid     = var.project_uuid
   server_uuid      = var.server_uuid
   environment_name = var.environment_name
-  image            = "redis:7"
+  image            = "redis:7.4"
   # Becomes the container's REDIS_PASSWORD (create_standalone_redis honors a supplied
   # redis_password); provider 0.1.7 sends it in the CREATE payload, not the 422-prone
   # extended-fields update.
