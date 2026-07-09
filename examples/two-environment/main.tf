@@ -10,6 +10,25 @@ resource "coolify_environment" "staging" {
   description  = "Staging environment"
 }
 
+locals {
+  # TRUSTED_PROXIES is a required invariant for correct HTTPS behind Coolify's proxy, NOT a
+  # tuning knob — so it is merged into static_env here rather than left in the tfvars/default,
+  # where overriding static_env (a map => replace, not merge) would silently drop it and break
+  # admin/storefront assets as mixed content. var.static_env wins, so an operator can still
+  # override the key deliberately.
+  #
+  # Coolify's proxy terminates TLS and forwards plain HTTP to the container, so Symfony must
+  # trust X-Forwarded-Proto (wired in config/packages/framework.yaml) to generate https URLs.
+  # Must be a literal IP/CIDR list: the "private_ranges" magic token is only expanded by
+  # Symfony's framework-bundle normalizer for a LITERAL yaml value; read via %env(TRUSTED_PROXIES)%
+  # it would reach Request::setTrustedProxies() unexpanded and match no IP. 0.0.0.0/0 trusts any
+  # upstream — safe because the container's :8000 is only reachable via Traefik on Coolify's
+  # internal docker network, never directly.
+  base_static_env = {
+    TRUSTED_PROXIES = "0.0.0.0/0"
+  }
+}
+
 module "production" {
   source           = "../../"
   environment_name = "production"
@@ -35,7 +54,7 @@ module "production" {
   backup_image         = var.backup_image
   backup_image_tag     = var.backup_image_tag
 
-  static_env    = var.static_env
+  static_env    = merge(local.base_static_env, var.static_env)
   log_host_base = var.log_host_base
   # enable_basic_auth defaults false — production runs the final-prod image (no basic-auth layer)
   mariadb_public_port = 4306
@@ -72,7 +91,7 @@ module "staging" {
   backup_image         = var.backup_image
   backup_image_tag     = var.backup_image_tag
 
-  static_env          = var.static_env
+  static_env          = merge(local.base_static_env, var.static_env)
   log_host_base       = var.log_host_base
   enable_basic_auth   = true # staging runs the final-protected image (nginx basic-auth)
   mariadb_public_port = 5306

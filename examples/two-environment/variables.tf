@@ -132,22 +132,8 @@ variable "staging" {
 
 variable "static_env" {
   type        = map(string)
-  description = "Non-secret shared env applied to web/workers/scheduler (both environments). Per-env values (APP_ENV, APP_DEBUG) live in the production/staging objects instead."
-  default = {
-    # Coolify's proxy terminates TLS and forwards plain HTTP to the container, so Symfony
-    # must trust X-Forwarded-Proto (wired in config/packages/framework.yaml) to generate
-    # https URLs — otherwise admin/storefront assets are http → blocked as mixed content.
-    #
-    # Must be a literal IP/CIDR list here: the "private_ranges" magic token is only expanded
-    # to real subnets by Symfony's framework-bundle config normalizer for a LITERAL yaml value.
-    # Our config reads it via %env(TRUSTED_PROXIES)%, so the token would reach
-    # Request::setTrustedProxies() unexpanded (as the string "private_ranges") and match no IP —
-    # the proxy is never trusted and X-Forwarded-Proto is ignored. (The uppercase runtime tokens
-    # REMOTE_ADDR / PRIVATE_SUBNETS *are* expanded by HttpFoundation, but we don't need them.)
-    # 0.0.0.0/0 trusts any upstream — safe because the container's :8000 is only reachable via
-    # Traefik on Coolify's internal docker network, never directly.
-    TRUSTED_PROXIES = "0.0.0.0/0"
-  }
+  description = "Extra non-secret shared env applied to web/workers/scheduler (both environments). Merged over the required TRUSTED_PROXIES invariant in main.tf (local.base_static_env). Per-env values (APP_ENV, APP_DEBUG) live in the production/staging objects instead."
+  default     = {}
 }
 
 # --- Log persistence ----------------------------------------------------------

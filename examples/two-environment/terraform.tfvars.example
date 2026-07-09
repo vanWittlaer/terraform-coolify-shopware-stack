@@ -14,9 +14,11 @@ backup_image     = "ghcr.io/you/shopware-ops-shell"
 backup_image_tag = "latest"
 
 # --- Extra env vars fanned out to every app process ---
-static_env = {
-  TRUSTED_PROXIES = "0.0.0.0/0" # safe ONLY if the web port is reachable only via the proxy
-}
+# TRUSTED_PROXIES is injected as a required invariant in main.tf (local.base_static_env), so you
+# do NOT set it here. Add only your own extra keys; they are merged on top and can't drop it.
+# static_env = {
+#   MY_FLAG = "1"
+# }
 
 # --- Host base dir for bind mounts (var/log, staging .htpasswd). "" disables the mounts ---
 log_host_base = "/data/shopware"
