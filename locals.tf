@@ -120,6 +120,11 @@ locals {
   # so it never receives the app's Redis/RabbitMQ DSNs, APP_SECRET, INSTANCE_ID, ES, monolog, etc.
   #   dump-db.sh / backup-db.sh -> DATABASE_URL, APP_ENV       (+ S3_BACKUP_* from backup_env)
   #   backup-s3.sh              -> the source-bucket S3_* creds (+ S3_BACKUP_* from backup_env)
+  #
+  # S3_SOURCE_PATH is the SAME in-bucket prefix the app writes under (S3_ROOT_PREFIX): when a
+  # bucket is shared across environments, backup-s3.sh mirrors only <bucket>/<prefix> instead of
+  # the whole bucket. Passing it verbatim (trailing slash and all) is fine — backup-s3.sh strips
+  # the slash — and it also anchors the script's public/** excludes at the right root.
   backup_app_env = {
     DATABASE_URL         = local.computed_env.DATABASE_URL
     APP_ENV              = local.computed_env.APP_ENV
@@ -129,6 +134,7 @@ locals {
     S3_DOMAIN            = local.computed_env.S3_DOMAIN
     S3_BUCKET_PUBLIC     = local.computed_env.S3_BUCKET_PUBLIC
     S3_BUCKET_PRIVATE    = local.computed_env.S3_BUCKET_PRIVATE
+    S3_SOURCE_PATH       = local.computed_env.S3_ROOT_PREFIX
   }
 
   # Backup-only destination env, merged over backup_app_env for the backup service: the

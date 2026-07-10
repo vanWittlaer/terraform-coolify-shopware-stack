@@ -159,6 +159,8 @@ variable "s3" {
     # In-bucket path prefix (S3_ROOT_PREFIX). null => auto "<environment_name>/" so
     # environments can share one bucket without colliding. "" => bucket root (use a
     # dedicated bucket per env). Any other value is used verbatim (trailing / added).
+    # Also fed to the backup sidecar as S3_SOURCE_PATH, so backup-s3.sh mirrors only
+    # this prefix (not the whole shared bucket) — needs shell image >= v1.1.0.
     path_prefix = optional(string, null)
   })
   description = "S3 object storage for the private/public filesystems (shopware/config/packages/shopware.yaml). Credentials are in var.secrets (s3_access_key_id / s3_secret_access_key)."
