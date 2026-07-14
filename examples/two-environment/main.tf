@@ -57,11 +57,10 @@ module "production" {
   static_env    = merge(local.base_static_env, var.static_env)
   log_host_base = var.log_host_base
   # enable_basic_auth defaults false — production runs the final-prod image (no basic-auth layer)
-  mariadb_public_port = 4306
-  rabbitmq_mgmt_port  = 25672
-  s3                  = var.production.s3
-  mailer_dsn          = var.secrets_production.mailer_dsn # production: real SMTP (secret)
-  secrets             = var.secrets_production
+  rabbitmq_mgmt_port = 25672
+  s3                 = var.production.s3
+  mailer_dsn         = var.secrets_production.mailer_dsn # production: real SMTP (secret)
+  secrets            = var.secrets_production
 }
 
 module "staging" {
@@ -91,13 +90,12 @@ module "staging" {
   backup_image         = var.backup_image
   backup_image_tag     = var.backup_image_tag
 
-  static_env          = merge(local.base_static_env, var.static_env)
-  log_host_base       = var.log_host_base
-  enable_basic_auth   = true # staging runs the final-protected image (nginx basic-auth)
-  mariadb_public_port = 5306
-  rabbitmq_mgmt_port  = 35672
-  s3                  = var.staging.s3
-  secrets             = var.secrets_staging
+  static_env         = merge(local.base_static_env, var.static_env)
+  log_host_base      = var.log_host_base
+  enable_basic_auth  = true # staging runs the final-protected image (nginx basic-auth)
+  rabbitmq_mgmt_port = 35672
+  s3                 = var.staging.s3
+  secrets            = var.secrets_staging
 
   depends_on = [coolify_environment.staging]
 }
