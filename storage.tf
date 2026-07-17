@@ -17,13 +17,13 @@ resource "coolify_storage" "app_logs" {
   mount_path       = "/var/www/html/var/log"
 }
 
-# .htpasswd for the staging basic-auth image (nginx-basic-auth/basic-auth.inc reads
+# .htpasswd for a host-gated basic-auth env (the web image's nginx/basic-auth.inc reads
 # /var/www/auth/.htpasswd). A DIRECTORY bind mount holding the file — coolify_storage has
 # no file-content field, and a single-file bind mount would be created as a directory when
 # the host path is absent, breaking auth_basic_user_file. The host dir + .htpasswd are
 # created out-of-band and chown 82 (same discipline as the var/log dir). Guarded by
 # local.basic_auth_host_path (enable_basic_auth + log_host_base): empty => no mount
-# (production runs final-prod, no basic-auth).
+# (e.g. production, whose FQDN isn't in the image's $auth_host_gate map).
 resource "coolify_storage" "basic_auth" {
   for_each = local.basic_auth_host_path == "" ? {} : local.app_env_targets
 

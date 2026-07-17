@@ -145,7 +145,7 @@ variable "log_host_base" {
 
 variable "enable_basic_auth" {
   type        = bool
-  description = "When true (and log_host_base is set), bind-mount <log_host_base>/<environment_name>/auth into the web app at /var/www/auth, holding the .htpasswd that the basic-auth image (final-protected) reads (see shopware/docker/nginx-basic-auth). A DIRECTORY mount, not a single file. Create the dir + .htpasswd out-of-band and chown 82 (like the var/log dir). Typically true for staging, false for production (final-prod carries no basic-auth config)."
+  description = "When true (and log_host_base is set), bind-mount <log_host_base>/<environment_name>/auth into the web app at /var/www/auth, holding the .htpasswd that the web image's host-gated basic-auth reads (see shopware/docker/nginx/basic-auth.conf). A DIRECTORY mount, not a single file. Create the dir + .htpasswd out-of-band and chown 82 (like the var/log dir). Set true for any env whose FQDN is listed in the image's $auth_host_gate map (typically staging); false where no host is gated (typically production)."
   default     = false
 }
 
