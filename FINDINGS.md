@@ -64,7 +64,7 @@ something that looks odd. Provider version `0.1.7`.
     null_resource (below) to reach the DBs + rabbitmq.
   - **var/log host bind mount — SHORT vs LONG compose syntax matters.** Coolify slugifies a
     short-form volume source (`${X}:/path` or a literal `/host:/path`) into a managed NAMED volume
-    (empty host source), and `coolify_storage` doesn't attach to service containers. Fix: the LONG
+    (empty host source), and `coolify_storage` doesn't attach to service containers (and, for the web app, can't make bind mounts at all on Coolify >= 4.6 — see storage.tf). Fix: the LONG
     form so it stays a real bind (Coolify keeps the host source AND interpolates it):
     ```
     volumes:
