@@ -82,7 +82,7 @@ A complete two-environment (production + staging) wiring is in
 | `mariadb_conf` / `redis_conf` | Per-service tuning (`redis_conf` is a `{cache,session}` map). |
 | `mariadb_public_port` / `rabbitmq_mgmt_port` | Host ports for DB / RabbitMQ mgmt UI. |
 | `log_host_base` | Host BASE dir for bind mounts; the module appends `/<environment_name>/var/log` (and `/auth`). Empty ⇒ no log mount. |
-| `enable_basic_auth` | Bind-mount `<log_host_base>/<env>/auth` (`.htpasswd`) into the web app — typically `true` for staging, `false` for production. |
+| `enable_basic_auth` | Bind-mount `<log_host_base>/<env>/auth` (`.htpasswd`) into the web app (created via the Coolify storages API, `type: file` directory mount) — typically `true` for staging, `false` for production. |
 | `s3` | Object-storage object (buckets/region/endpoint/cdn). |
 | `secrets` | Sensitive object (`app_secret`, `instance_id`, S3/RabbitMQ/backup creds, `server_uuid`). |
 

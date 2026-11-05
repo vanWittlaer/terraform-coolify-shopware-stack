@@ -136,9 +136,10 @@ resource "coolify_application_docker_image" "mailpit" {
   # Without it, only the "<uuid>-<deploy-id>" container name resolves — never the bare uuid —
   # and MAILER_DSN (locals.tf, local.mailpit_host) can't connect. Keep in sync with that local.
   custom_network_aliases = local.mailpit_host
-  # Public FQDN for the web UI → Traefik routes it to Mailpit's 8025 (the :8025 suffix, same
-  # form as the web app's domains). Omitted when mailpit_domain is empty (internal-only).
-  domains              = var.mailpit_domain == "" ? null : "${var.mailpit_domain}:8025"
+  # Public FQDN for the web UI. No :8025 suffix (see apps.tf: Coolify >= 4.6 drops it and the
+  # provider errors on the mismatch); 8025 is the FIRST ports_exposes entry, which is the port
+  # Coolify routes to when the domain carries none. Omitted when mailpit_domain is empty.
+  domains              = var.mailpit_domain == "" ? null : var.mailpit_domain
   health_check_enabled = false # mailpit UI is on 8025, not the default-checked port
   instant_deploy       = true
 }

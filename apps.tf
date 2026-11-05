@@ -16,10 +16,10 @@ resource "coolify_application_docker_image" "web" {
   docker_image              = var.web_image
   docker_registry_image_tag = var.web_image_tag
   ports_exposes             = local.web_port
-  # Coolify maps the public domain to the container port via the :PORT suffix here. This
-  # is only the proxy routing hint — the site is still served on 443. APP_URL (locals.tf)
-  # deliberately stays port-less.
-  domains = "${var.web_domain}:${local.web_port}"
+  # No :PORT suffix: Coolify >= 4.6 stores/returns the domain without it, and provider 0.1.30
+  # then fails with "Provider produced inconsistent result after apply" (.domains). The single
+  # ports_exposes value above is what Traefik routes to. APP_URL (locals.tf) stays port-less too.
+  domains = var.web_domain
 
   # Liveness probe: Shopware's dedicated lightweight endpoint (returns 200) on the nginx
   # container port. start_period gives the app time to boot before failures count, so a
