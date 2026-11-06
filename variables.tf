@@ -59,9 +59,12 @@ variable "backup_image_tag" {
 
 variable "backup" {
   type = object({
-    s3_backup_bucket      = string
-    s3_backup_region      = string                         # e.g. "fsn1" — DIFFERENT location from the source buckets
-    s3_backup_domain      = string                         # e.g. "https://fsn1.your-objectstorage.com"
+    s3_backup_bucket = string
+    s3_backup_region = string # e.g. "fsn1" — DIFFERENT location from the source buckets
+    # Region endpoint WITHOUT the bucket name (the sidecar uses path-style requests): e.g.
+    # "https://fsn1.your-objectstorage.com", not "https://<bucket>.fsn1...". A bucket-in-host
+    # endpoint makes uploads land under a doubled prefix and listings fail with "directory not found".
+    s3_backup_domain      = string
     s3_backup_path        = optional(string, "")           # in-bucket prefix; keep prod/staging distinct if sharing a bucket
     db_backups_to_keep    = optional(number, 60)           # DB_BACKUPS_TO_KEEP
     s3_backup_retain_days = optional(number, 30)           # S3_BACKUP_RETAIN_DAYS (soft-delete retention)

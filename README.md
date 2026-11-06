@@ -79,6 +79,13 @@ A complete two-environment (production + staging) wiring is in
 | `enable_elasticsearch` / `enable_mailpit` / `enable_backup` | Feature toggles. |
 | `mailpit_domain` | Public FQDN for the staging Mailpit UI (Traefik → :8025). |
 | `backup` / `backup_image` / `backup_image_tag` | Backup sidecar config + image. |
+
+> **Backup notes** (sidecar image `>= v1.1.4`): `backup.s3_backup_domain` (and `s3.endpoint`) must be the
+> plain region endpoint, e.g. `https://fra1.digitaloceanspaces.com`, **not** a bucket-in-host URL such as
+> `https://<bucket>.fra1...` (path-style requests would resolve the wrong key). Also, stray folder-marker
+> objects (keys ending in `/`, created by some S3 UIs/clients) in the source buckets make `backup-s3.sh`
+> fail with a nameless `GetObject ... NoSuchKey`; the sidecar now lists them and prints the `curl` command
+> to delete each one.
 | `mariadb_conf` / `redis_conf` | Per-service tuning (`redis_conf` is a `{cache,session}` map). |
 | `mariadb_public_port` / `rabbitmq_mgmt_port` | Host ports for DB / RabbitMQ mgmt UI. |
 | `log_host_base` | Host BASE dir for bind mounts; the module appends `/<environment_name>/var/log` (and `/auth`). Empty ⇒ no log mount. |
